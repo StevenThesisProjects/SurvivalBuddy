@@ -1,0 +1,15 @@
+# Bỏ qua các file checkpoint/cache
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+
+# Bỏ qua dữ liệu nặng
+data/
+outputs/drone_training_img1024/
+
+# Bỏ qua weights nặng (Chỉ giữ lại code)
+weights/*.pt
+!weights/.gitkeep
+
+# Giữ lại báo cáo CSV 
+!outputs/export_package/ablation_results.csv
