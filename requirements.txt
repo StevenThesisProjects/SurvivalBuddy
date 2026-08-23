@@ -1,8 +1,11 @@
-torch
+torch>=2.5.0
 torchvision
-ultralytics
+ultralytics>=8.4.110
+sahi>=0.11.15
+transformers>=4.40.0
 opencv-python
+pillow
 numpy
 pandas
-decord
-gradio
+tqdm
+PyYAML

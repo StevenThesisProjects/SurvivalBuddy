@@ -1,0 +1,12 @@
+{
+  "Elapsed Time (s)": 2581.07,
+  "Throughput (FPS)": 13.78,
+  "Peak VRAM (GB)": 4.62,
+  "Model": "Faster R-CNN ResNet50-FPN V2",
+  "Validation STIoU": 0.4517,
+  "Per-Video STIoU": {
+    "Backpack_0": 0.0813,
+    "Backpack_1": 0.7269,
+    "Person1_0": 0.547
+  }
+}
