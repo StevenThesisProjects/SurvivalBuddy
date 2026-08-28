@@ -1,0 +1,5 @@
+STT,Model Name,Architecture Type,Val STIoU,mAP@0.50,Precision,Recall,Peak VRAM,Latency (ms),FPS (Throughput)
+01,YOLO26-Nano (Baseline),One-Stage (Nano),0.4569,-,-,-,0.15 GB,11.11,90.0
+02,Faster R-CNN (ResNet50),Two-Stage,0.4517,-,-,-,4.62 GB,72.57,13.8
+03,RT-DETR Large,Transformer,0.4312,0.5944,0.8284,0.5446,1.00 GB,32.32,30.9
+04,YOLO11-Large (DS-ORS),One-Stage (Large),-,0.4669,0.7698,0.4441,-,9.31,107.4

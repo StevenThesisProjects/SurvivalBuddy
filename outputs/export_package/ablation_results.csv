@@ -1,2 +1,7 @@
-,Total Test Videos,Total Detected BBoxes,Avg BBoxes / Video,Status
-DS-ORS Pipeline (Public Test Submission),14,26702,1907.29,Ready for Contest Submission
+Video ID,Detected BBoxes
+BlackBox_0,2723
+BlackBox_1,5529
+CardboardBox_0,1427
+CardboardBox_1,1579
+LifeJacket_0,7870
+LifeJacket_1,4048
