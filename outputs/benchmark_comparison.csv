@@ -1,0 +1,6 @@
+STT,Model Name,Architecture Type,Detector mAP@0.50,Detector Recall,End-to-End STIoU,Peak VRAM,Latency (ms),Throughput (FPS)
+01,YOLO26-Nano (Baseline),One-Stage CNN,0.3494,0.2961,0.4569,0.15 GB,11.11,90.0
+02,Faster R-CNN (ResNet50),Two-Stage Anchor,0.4120,0.3850,0.4517,4.62 GB,72.57,13.8
+03,RT-DETR Large,Real-Time Transformer,0.5944,0.5446,0.4312,1.00 GB,32.32,30.9
+04,YOLO11-Large (Global),One-Stage CNN,0.4669,0.4441,0.4620,0.85 GB,9.31,107.4
+05,YOLO11-Large + SAHI (DS-ORS),Sliced Inference,0.5812,0.5280,0.5340,1.45 GB,38.20,26.2

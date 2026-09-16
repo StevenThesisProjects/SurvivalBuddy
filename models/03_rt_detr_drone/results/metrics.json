@@ -1,0 +1,16 @@
+{
+  "Elapsed Time (s)": 1149.95,
+  "Throughput (FPS)": 30.94,
+  "Peak VRAM (GB)": 1.0,
+  "Model": "RT-DETR-L",
+  "Precision": 0.8284,
+  "Recall": 0.5446,
+  "mAP50": 0.5944,
+  "mAP50-95": 0.3108,
+  "Validation STIoU": 0.4312,
+  "Per-Video STIoU": {
+    "Backpack_0": 0.142,
+    "Backpack_1": 0.6913,
+    "Person1_0": 0.4603
+  }
+}

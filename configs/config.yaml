@@ -1,0 +1,15 @@
+model:
+  detector_path: "weights/best_ds_ors.pt"
+  clip_backbone: "openai/clip-vit-large-patch14"
+
+inference:
+  target_size: 1280
+  batch_size: 4
+  conf_threshold: 0.15                  # Ngưỡng YOLO vừa phải
+  similarity_threshold: 0.25            # Điểm ngọt cho Zero-Shot Matcher (tránh bị lọc sạch rỗng)
+  device: "cuda"
+
+paths:
+  train_data: "dataset/training/train/samples"
+  test_data: "dataset/public_test/samples"
+  output_json: "outputs/submission.json"

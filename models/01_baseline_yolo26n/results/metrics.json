@@ -1,0 +1,12 @@
+{
+  "Elapsed Time (s)": 395.35,
+  "Throughput (FPS)": 89.98,
+  "Peak VRAM (GB)": 0.15,
+  "Model": "YOLO26n Baseline",
+  "Validation STIoU": 0.4569,
+  "Per-Video STIoU": {
+    "Backpack_0": 0.477,
+    "Backpack_1": 0.5266,
+    "Person1_0": 0.3672
+  }
+}
