@@ -83,31 +83,33 @@ class CentroidTracker:
         del self.objects[object_id]
         del self.disappeared[object_id]
 
-class MotionDistanceFilter:
-    def __init__(self, max_pixel_distance: float = 140.0):
-        self.max_pixel_distance = max_pixel_distance
-        self.last_positions = {}
+class NormalizedMotionFilter:
+    def __init__(self, max_norm_velocity: float = 0.15):
+        self.max_velocity = max_norm_velocity
+        self.last_records = {} 
 
-    def is_valid(self, track_id: int, bbox: list) -> bool:
+    def is_valid(self, track_id: int, bbox: list, frame_w: int, frame_h: int, timestamp: float) -> bool:
         x1, y1, x2, y2 = bbox
-        cx = (x1 + x2) / 2.0
-        cy = (y1 + y2) / 2.0
-
-        if track_id not in self.last_positions:
-            self.last_positions[track_id] = (cx, cy)
+        cx, cy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+        diag = np.sqrt(frame_w**2 + frame_h**2)
+        
+        if track_id not in self.last_records:
+            self.last_records[track_id] = (cx, cy, timestamp)
             return True
-
-        prev_cx, prev_cy = self.last_positions[track_id]
-        distance = np.sqrt((cx - prev_cx) ** 2 + (cy - prev_cy) ** 2)
-
-        if distance > self.max_pixel_distance:
+            
+        prev_cx, prev_cy, prev_t = self.last_records[track_id]
+        dt = max(1e-3, timestamp - prev_t)
+        dist_px = np.sqrt((cx - prev_cx)**2 + (cy - prev_cy)**2)
+        norm_v = (dist_px / diag) / dt
+        
+        if norm_v > self.max_velocity:
             return False
-
-        self.last_positions[track_id] = (cx, cy)
+            
+        self.last_records[track_id] = (cx, cy, timestamp)
         return True
 
     def reset(self):
-        self.last_positions.clear()
+        self.last_records.clear()
 
 class HybridZeroShotMatcher(nn.Module):
     def __init__(self, clip_model="openai/clip-vit-large-patch14", dino_model="facebook/dinov2-base", clip_weight=0.75):
@@ -126,35 +128,49 @@ class HybridZeroShotMatcher(nn.Module):
         for p in self.dino.parameters():
             p.requires_grad = False
 
+    def _extract_clip_features(self, pixel_values):
+        clip_out = self.clip(pixel_values=pixel_values)
+        feat = clip_out.image_embeds if hasattr(clip_out, 'image_embeds') and clip_out.image_embeds is not None else clip_out[0]
+        if feat.ndim > 2:
+            feat = feat[:, 0] if feat.shape[1] > 1 else feat.squeeze(1)
+        return F.normalize(feat, dim=-1)
+
+    def _extract_dino_features(self, pixel_values):
+        outputs = self.dino(pixel_values=pixel_values)
+        if hasattr(outputs, 'pooler_output') and outputs.pooler_output is not None:
+            feat = outputs.pooler_output
+        elif hasattr(outputs, 'last_hidden_state') and outputs.last_hidden_state is not None:
+            feat = outputs.last_hidden_state[:, 0]  # CLS token an toàn tuyệt đối
+        else:
+            feat = outputs[0][:, 0]
+        if feat.ndim > 2:
+            feat = feat.mean(dim=1)
+        return F.normalize(feat, dim=-1)
+
     def encode_queries(self, ref_images: list):
-        # CLIP Query Feature
-        c_in = self.clip_processor(images=ref_images, return_tensors="pt")
-        c_in = {k: v.to(next(self.parameters()).device) for k, v in c_in.items()}
-        with torch.no_grad():
-            c_feat = F.normalize(self.clip(**c_in).image_embeds, dim=-1)
-            q_clip = F.normalize(c_feat.mean(dim=0, keepdim=True), dim=-1)
+        device = next(self.parameters()).device
+        clip_feats = []
+        dino_feats = []
+        for img in ref_images:
+            c_in = self.clip_processor(images=img, return_tensors="pt").to(device)
+            c_feat = self._extract_clip_features(c_in['pixel_values'])
+            clip_feats.append(c_feat)
 
-        # DINO Query Feature
-        d_in = self.dino_processor(images=ref_images, return_tensors="pt")
-        d_in = {k: v.to(next(self.parameters()).device) for k, v in d_in.items()}
-        with torch.no_grad():
-            d_out = self.dino(**d_in)
-            d_feat = F.normalize(d_out.pooler_output, dim=-1)
-            q_dino = F.normalize(d_feat.mean(dim=0, keepdim=True), dim=-1)
+            d_in = self.dino_processor(images=img, return_tensors="pt").to(device)
+            d_feat = self._extract_dino_features(d_in['pixel_values'])
+            dino_feats.append(d_feat)
 
-        return q_clip, q_dino
+        q_clip = torch.cat(clip_feats, dim=0).mean(dim=0, keepdim=True)
+        q_dino = torch.cat(dino_feats, dim=0).mean(dim=0, keepdim=True)
+        return F.normalize(q_clip, dim=-1), F.normalize(q_dino, dim=-1)
 
     def extract_crop_features(self, pil_crop: Image.Image):
-        c_in = self.clip_processor(images=[pil_crop], return_tensors="pt")
-        c_in = {k: v.to(next(self.parameters()).device) for k, v in c_in.items()}
-        with torch.no_grad():
-            roi_clip = F.normalize(self.clip(**c_in).image_embeds, dim=-1)
+        device = next(self.parameters()).device
+        c_in = self.clip_processor(images=[pil_crop], return_tensors="pt").to(device)
+        roi_clip = self._extract_clip_features(c_in['pixel_values'])
 
-        d_in = self.dino_processor(images=[pil_crop], return_tensors="pt")
-        d_in = {k: v.to(next(self.parameters()).device) for k, v in d_in.items()}
-        with torch.no_grad():
-            d_out = self.dino(**d_in)
-            roi_dino = F.normalize(d_out.pooler_output, dim=-1)
+        d_in = self.dino_processor(images=[pil_crop], return_tensors="pt").to(device)
+        roi_dino = self._extract_dino_features(d_in['pixel_values'])
 
         return roi_clip, roi_dino
 
@@ -165,7 +181,6 @@ class HybridZeroShotMatcher(nn.Module):
         sim_clip = max(0.0, sim_clip)
         sim_dino = max(0.0, sim_dino)
         
-        # Weighted Ensemble score
         blended = (self.clip_weight * sim_clip) + (self.dino_weight * sim_dino)
         return max(0.0, min(1.0, blended))
 
@@ -177,12 +192,12 @@ print(f"Dang tai SAHI Detection Model tu: {best_w}...")
 detection_model = AutoDetectionModel.from_pretrained(
     model_type="yolov8", 
     model_path=str(best_w),
-    confidence_threshold=0.15,
+    confidence_threshold=0.50,
     device=DEVICE,
 )
 
 matcher = HybridZeroShotMatcher(clip_weight=0.75).to(DEVICE)
-motion_filter = MotionDistanceFilter(max_pixel_distance=140.0)
+motion_filter = NormalizedMotionFilter(max_norm_velocity=0.15)
 tracker = CentroidTracker(max_disappeared=8, max_distance=160)
 
 def process_video(video_file, img1, img2, img3, match_threshold, progress=gr.Progress()):
@@ -233,7 +248,6 @@ def process_video(video_file, img1, img2, img3, match_threshold, progress=gr.Pro
         secs = current_seconds % 60
         timestamp_str = f"{mins:02d}:{secs:02d}"
 
-        # SAHI Tiled Inference
         sahi_result = get_sliced_prediction(
             frame,
             detection_model,
@@ -241,6 +255,9 @@ def process_video(video_file, img1, img2, img3, match_threshold, progress=gr.Pro
             slice_width=512,
             overlap_height_ratio=0.2,
             overlap_width_ratio=0.2,
+            perform_standard_pred=False,
+            postprocess_type="NMS",
+            postprocess_match_threshold=0.50,
             verbose=False
         )
 
@@ -257,7 +274,7 @@ def process_video(video_file, img1, img2, img3, match_threshold, progress=gr.Pro
             conf_val = bbox[4]
             bbox_coords = bbox[:4]
             
-            if not motion_filter.is_valid(track_id, bbox_coords):
+            if not motion_filter.is_valid(track_id, bbox_coords, w, h, current_seconds):
                 continue
 
             raw_sim = 0.0
@@ -362,7 +379,7 @@ def process_video(video_file, img1, img2, img3, match_threshold, progress=gr.Pro
 
 with gr.Blocks(title="SurvivalBuddy DS-ORS Demo") as demo:
     gr.Markdown("# SurvivalBuddy: Drone Rescue System (SAHI + Ensemble CLIP-DINOv2)")
-    gr.Markdown("He thong dinh vi muc tieu khong-thoi gian goc nhin Drone ket hop YOLO11l, SAHI, CLIP va DINOv2")
+    gr.Markdown("He thong dinh vi muc tieu khong-thoi gian goc nhin Drone ket hợp YOLO11l, SAHI, CLIP va DINOv2")
     
     with gr.Row():
         with gr.Column(scale=1):
@@ -372,7 +389,7 @@ with gr.Blocks(title="SurvivalBuddy DS-ORS Demo") as demo:
             ref3 = gr.Image(label="Anh goc 3", type="numpy")
             
             gr.Markdown("### 2. Thiet lap thong so")
-            thresh = gr.Slider(0.1, 0.9, value=0.50, step=0.05, label="Match Confidence Threshold")
+            thresh = gr.Slider(0.1, 0.9, value=0.35, step=0.05, label="Match Confidence Threshold")
             
             btn_run = gr.Button("BAT DAU TIM KIEM MUC TIEU", variant="primary")
             
@@ -384,7 +401,7 @@ with gr.Blocks(title="SurvivalBuddy DS-ORS Demo") as demo:
             output_video = gr.Video(label="Target Localization Output")
             
             gr.Markdown("### 5. Hinh anh vat the chup tu dong")
-            output_gallery = gr.Gallery(label="Anh chup muc tieu (Kem thoi gian)", columns=4, height="auto")
+            output_gallery = gr.Gallery(label="Anh chup muc tieu (Kem thoi gian)", columns=4, height=400)
             
             status_text = gr.Textbox(label="Bao cao Toa do va Trang thai Dinh vi", lines=12)
 
@@ -395,4 +412,4 @@ with gr.Blocks(title="SurvivalBuddy DS-ORS Demo") as demo:
     )
 
 if __name__ == "__main__":
-    demo.queue().launch(server_name="0.0.0.0", server_port=7860, share=False)
+    demo.queue().launch(server_name="0.0.0.0", server_port=7860, share=True)

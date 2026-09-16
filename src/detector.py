@@ -22,7 +22,8 @@ class DroneSmallObjectDetector:
         self.slice_w = slice_width
         self.overlap = overlap_ratio
 
-    def detect(self, frame: np.ndarray) -> list:
+    def detect_batched_slices(self, frame: np.ndarray, batch_size: int = 16) -> list:
+        # Sử dụng get_sliced_prediction với thiết lập tối ưu cho Batching và NMS
         result = get_sliced_prediction(
             frame,
             self.detection_model,
@@ -30,10 +31,12 @@ class DroneSmallObjectDetector:
             slice_width=self.slice_w,
             overlap_height_ratio=self.overlap,
             overlap_width_ratio=self.overlap,
-            postprocess_type="GREEDYNMM",
-            postprocess_match_threshold=0.5,
+            perform_standard_pred=False,
+            postprocess_type="NMS",
+            postprocess_match_threshold=0.50,
             verbose=0
         )
+        
         detections = []
         for pred in result.object_prediction_list:
             bbox = pred.bbox.to_xyxy()

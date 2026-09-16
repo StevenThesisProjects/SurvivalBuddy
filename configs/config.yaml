@@ -1,36 +1,15 @@
-# model:
-#   detector_path: "yolo11x.pt"           # Sử dụng weights YOLO11 bản lớn để lọc 
-#   clip_backbone: "ViT-B/32"             # Kiến trúc mạng đặc trưng CLIP
-
-# inference:
-#   target_size: 1280                     # Giữ độ phân giải cao để bảo toàn vật thể siêu nhỏ
-#   batch_size: 4
-#   conf_threshold: 0.25                  # Ngưỡng tin cậy lọc trong YOLO
-#   similarity_threshold: 0.65            # Ngưỡng tương đồng Cosine Similarity của CLIP
-#   device: "cpu"                         # Chạy CPU trên Codespaces (Có thể chuyển sang chạy GPU)
-
-# paths:
-#   train_data: "data/training/train/samples"
-#   test_data: "data/public_test/public_test/samples"
-#   output_json: "data/public_test/submission.json"
-
 model:
-  detector_path: "yolo11n.pt"           # Đổi từ bản 'x' (XLarge) sang bản 'n' (Nano) 
-  clip_backbone: "ViT-B/32"
+  detector_path: "weights/best_ds_ors.pt"
+  clip_backbone: "openai/clip-vit-large-patch14"
 
 inference:
-  target_size: 640                     # Hạ về 640 để RAM CPU có thể chịu tải 
-  batch_size: 1                        # Giảm batch size về 1 
-  conf_threshold: 0.25
-  similarity_threshold: 0.65
-  device: "cpu"
+  target_size: 1280
+  batch_size: 4
+  conf_threshold: 0.15                  # Ngưỡng YOLO vừa phải
+  similarity_threshold: 0.25            # Điểm ngọt cho Zero-Shot Matcher (tránh bị lọc sạch rỗng)
+  device: "cuda"
 
 paths:
-  train_data: "data/training/train/samples"
-  test_data: "data/public_test/public_test/samples"
-  output_json: "data/public_test/submission.json"
-
-# paths:
-#   train_data: "data/training/train/samples"
-#   test_data: "data/training/train/samples"
-#   output_json: "data/training/train_submission.json"
+  train_data: "dataset/training/train/samples"
+  test_data: "dataset/public_test/samples"
+  output_json: "outputs/submission.json"
